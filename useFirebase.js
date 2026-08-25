@@ -3,6 +3,7 @@ import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { eventsData as fallbackEvents } from "../data/eventsData";
 import { projectsData as fallbackProjects } from "../data/projectsData";
+import { galleryItems as fallbackGallery } from "../data/galleryData";
 import { 
   facultyCoordinator as fallbackFaculty, 
   executiveCommittee as fallbackExec, 
@@ -23,6 +24,7 @@ const iconMap = {
 export const useFirebaseData = () => {
   const [events, setEvents] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [gallery, setGallery] = useState([]);
   const [team, setTeam] = useState({
     facultyCoordinator: fallbackFaculty,
     executiveCommittee: fallbackExec,
@@ -64,6 +66,18 @@ export const useFirebaseData = () => {
 
         if (fetchedProjects.length === 0) {
           fetchedProjects = fallbackProjects;
+        }
+
+        // Fetch Gallery
+        const galleryRef = collection(db, "gallery");
+        const gallerySnapshot = await getDocs(galleryRef);
+        let fetchedGallery = gallerySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+
+        if (fetchedGallery.length === 0) {
+          fetchedGallery = fallbackGallery;
         }
 
         // Fetch Settings
@@ -132,11 +146,13 @@ export const useFirebaseData = () => {
 
         setEvents(fetchedEvents);
         setProjects(fetchedProjects);
+        setGallery(fetchedGallery);
         setTeam(processedTeam);
       } catch (err) {
         console.warn("Failed to fetch data from Firebase. Using local fallbacks.", err);
         setEvents(fallbackEvents);
         setProjects(fallbackProjects);
+        setGallery(fallbackGallery);
         setTeam({
           facultyCoordinator: fallbackFaculty,
           executiveCommittee: fallbackExec,
@@ -153,5 +169,5 @@ export const useFirebaseData = () => {
     fetchData();
   }, []);
 
-  return { events, projects, team, loading };
+  return { events, projects, gallery, team, loading };
 };'

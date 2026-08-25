@@ -19,7 +19,7 @@ import {
   setDoc
 } from 'firebase/firestore';
 import { 
-  LogOut, Plus, Edit2, Trash2, Image, Cpu, Loader2, Lock, User, ChevronRight, Settings, UploadCloud, MessageSquare, Save, Mail, Calendar, MapPin
+  LogOut, Plus, Edit2, Trash2, Image, Cpu, Loader2, Lock, User, ChevronRight, Settings, UploadCloud, MessageSquare, Save, Mail, Calendar, MapPin, Grid
 } from 'lucide-react';
 
 const iconList = ['Cpu', 'Radio', 'Wifi', 'Zap', 'Globe', 'Github'];
@@ -34,10 +34,11 @@ function App() {
   const [authError, setAuthError] = useState('');
 
   // Dashboard state
-  const [activeTab, setActiveTab] = useState('events'); // 'events' | 'projects' | 'team' | 'messages' | 'settings'
+  const [activeTab, setActiveTab] = useState('events'); // 'events' | 'projects' | 'team' | 'gallery' | 'messages' | 'settings'
   const [events, setEvents] = useState([]);
   const [projects, setProjects] = useState([]);
   const [team, setTeam] = useState([]);
+  const [gallery, setGallery] = useState([]);
   const [messages, setMessages] = useState([]);
   const [currentActiveYear, setCurrentActiveYear] = useState('2025-2026');
   const [dataLoading, setDataLoading] = useState(false);
@@ -55,6 +56,7 @@ function App() {
   const [showEventModal, setShowEventModal] = useState(false);
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [showTeamModal, setShowTeamModal] = useState(false);
+  const [showGalleryModal, setShowGalleryModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
 
   // File Upload State
@@ -101,6 +103,16 @@ function App() {
     linkedin: '',
     order: 0,
     committeeYear: '2025-2026'
+  });
+
+  // Gallery Form Fields
+  const [galleryForm, setGalleryForm] = useState({
+    title: '',
+    category: 'Workshop',
+    date: '',
+    color: 'bg-primary/15',
+    image: '',
+    caption: ''
   });
 
   // Year Config management state
@@ -158,10 +170,14 @@ function App() {
       tm.sort((a, b) => (a.order || 0) - (b.order || 0));
       setTeam(tm);
 
+      // Gallery
+      const gallerySnap = await getDocs(collection(db, 'gallery'));
+      const gal = gallerySnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setGallery(gal);
+
       // Messages
       const msgSnap = await getDocs(collection(db, 'messages'));
       const msgs = msgSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // Sort messages descending by timestamp
       msgs.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
       setMessages(msgs);
     } catch (err) {
@@ -189,6 +205,7 @@ function App() {
       setEvents([]);
       setProjects([]);
       setTeam([]);
+      setGallery([]);
       setMessages([]);
     } catch (err) {
       console.error(err);
@@ -230,6 +247,8 @@ function App() {
         setProjectForm(prev => ({ ...prev, image: publicUrl }));
       } else if (type === 'team') {
         setTeamForm(prev => ({ ...prev, image: publicUrl }));
+      } else if (type === 'gallery') {
+        setGalleryForm(prev => ({ ...prev, image: publicUrl }));
       }
     } catch (err) {
       console.error("Supabase upload error:", err);
@@ -328,6 +347,29 @@ function App() {
       fetchDashboardData();
     } catch (err) {
       alert("Error saving member: " + err.message);
+    }
+  };
+
+  // Submit Gallery Form (Add/Update)
+  const handleGallerySubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const data = {
+        ...galleryForm
+      };
+
+      if (editingItem) {
+        await updateDoc(doc(db, 'gallery', editingItem.id), data);
+      } else {
+        await addDoc(collection(db, 'gallery'), data);
+      }
+
+      setShowGalleryModal(false);
+      setEditingItem(null);
+      resetGalleryForm();
+      fetchDashboardData();
+    } catch (err) {
+      alert("Error saving gallery item: " + err.message);
     }
   };
 
@@ -434,6 +476,20 @@ function App() {
     setShowTeamModal(true);
   };
 
+  // Open edit gallery modal
+  const startEditGallery = (item) => {
+    setEditingItem(item);
+    setGalleryForm({
+      title: item.title || '',
+      category: item.category || 'Workshop',
+      date: item.date || '',
+      color: item.color || 'bg-primary/15',
+      image: item.image || '',
+      caption: item.caption || ''
+    });
+    setShowGalleryModal(true);
+  };
+
   const resetEventForm = () => {
     setEventForm({
       title: '',
@@ -477,6 +533,17 @@ function App() {
       linkedin: '',
       order: 0,
       committeeYear: '2025-2026'
+    });
+  };
+
+  const resetGalleryForm = () => {
+    setGalleryForm({
+      title: '',
+      category: 'Workshop',
+      date: '',
+      color: 'bg-primary/15',
+      image: '',
+      caption: ''
     });
   };
 
@@ -602,6 +669,12 @@ function App() {
               EXECOM DIRECTORY
             </button>
             <button 
+              className={`tab ${activeTab === 'gallery' ? 'active' : ''}`}
+              onClick={() => setActiveTab('gallery')}
+            >
+              GALLERY ARCHIVE
+            </button>
+            <button 
               className={`tab ${activeTab === 'messages' ? 'active' : ''}`}
               onClick={() => setActiveTab('messages')}
               style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
@@ -644,6 +717,14 @@ function App() {
                 className="btn btn-primary"
               >
                 <Plus size={16} /> NEW MEMBER PROFILE
+              </button>
+            )}
+            {activeTab === 'gallery' && (
+              <button 
+                onClick={() => { setEditingItem(null); resetGalleryForm(); setShowGalleryModal(true); }}
+                className="btn btn-primary"
+              >
+                <Plus size={16} /> NEW GALLERY ITEM
               </button>
             )}
           </div>
@@ -747,6 +828,38 @@ function App() {
                             <Edit2 size={12} /> EDIT
                           </button>
                           <button onClick={() => handleDeleteItem(member.id, 'team')} className="btn btn-danger" style={{ padding: '0.4rem 0.8rem' }}>
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* GALLERY VIEW */}
+            {activeTab === 'gallery' && (
+              <div>
+                {gallery.length === 0 ? (
+                  <div className="glass-card" style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                    No gallery items found in Cloud Firestore. Click "NEW GALLERY ITEM" to add your first photo.
+                  </div>
+                ) : (
+                  <div className="item-grid">
+                    {gallery.map((item) => (
+                      <div key={item.id} className="glass-card dashboard-card">
+                        {item.image && <img src={item.image} alt="" className="dashboard-card-image" />}
+                        <div className="card-content">
+                          <span className="card-meta">{item.category} • {item.date}</span>
+                          <h3 className="card-title">{item.title}</h3>
+                          <p className="card-desc">{item.caption}</p>
+                        </div>
+                        <div className="card-actions">
+                          <button onClick={() => startEditGallery(item)} className="btn btn-secondary" style={{ padding: '0.4rem 0.8rem', flexGrow: 1 }}>
+                            <Edit2 size={12} /> EDIT
+                          </button>
+                          <button onClick={() => handleDeleteItem(item.id, 'gallery')} className="btn btn-danger" style={{ padding: '0.4rem 0.8rem' }}>
                             <Trash2 size={12} />
                           </button>
                         </div>
@@ -1398,6 +1511,118 @@ function App() {
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowTeamModal(false)}>CANCEL</button>
                 <button type="submit" className="btn btn-primary">SAVE MEMBER</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ----------------- GALLERY FORM MODAL ----------------- */}
+      {showGalleryModal && (
+        <div className="modal-overlay">
+          <div className="glass-card modal-content">
+            <div className="modal-header">
+              <h3 className="modal-title">{editingItem ? 'Edit Gallery Item' : 'New Gallery Item'}</h3>
+              <button className="close-btn" onClick={() => setShowGalleryModal(false)}>×</button>
+            </div>
+            
+            <form onSubmit={handleGallerySubmit}>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem' }}>
+                <div className="form-group">
+                  <label>Photo Title *</label>
+                  <input 
+                    type="text" required 
+                    value={galleryForm.title} 
+                    onChange={e => setGalleryForm({...galleryForm, title: e.target.value})} 
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Event Date * (e.g. Feb 2025)</label>
+                  <input 
+                    type="text" required placeholder="Feb 2025"
+                    value={galleryForm.date} 
+                    onChange={e => setGalleryForm({...galleryForm, date: e.target.value})} 
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-group">
+                  <label>Category * (e.g. Workshop, Hackathon)</label>
+                  <input 
+                    type="text" required placeholder="Workshop"
+                    value={galleryForm.category} 
+                    onChange={e => setGalleryForm({...galleryForm, category: e.target.value})} 
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Highlight Accent Color</label>
+                  <select 
+                    value={galleryForm.color} 
+                    onChange={e => setGalleryForm({...galleryForm, color: e.target.value})}
+                  >
+                    <option value="bg-primary/15">Cyber Blue (bg-primary/15)</option>
+                    <option value="bg-secondary/15">Teal (bg-secondary/15)</option>
+                    <option value="bg-accent/15">Orange (bg-accent/15)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Caption / Short Description *</label>
+                <textarea 
+                  required 
+                  value={galleryForm.caption} 
+                  onChange={e => setGalleryForm({...galleryForm, caption: e.target.value})} 
+                />
+              </div>
+
+              {/* Gallery Image Dropzone Section */}
+              <div className="form-group">
+                <label>Gallery Image *</label>
+                <div 
+                  className="dropzone"
+                  onDragOver={e => e.preventDefault()}
+                  onDrop={e => {
+                    e.preventDefault();
+                    const file = e.dataTransfer.files[0];
+                    if (file) handleFileDirectUpload(file, 'gallery');
+                  }}
+                  onClick={() => document.getElementById('gallery-file-input').click()}
+                >
+                  <input 
+                    type="file" 
+                    id="gallery-file-input"
+                    style={{ display: 'none' }} 
+                    accept="image/*" 
+                    onChange={e => handleFileUpload(e, 'gallery')} 
+                  />
+                  <UploadCloud size={28} style={{ color: 'var(--accent)', marginBottom: '0.25rem' }} />
+                  <span className="dropzone-text">Drag & drop image here or click to browse</span>
+                  <span className="dropzone-subtext">Supports PNG, JPG, WEBP from your desktop</span>
+                </div>
+                {uploadProgress !== null && (
+                  <div style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--accent)', marginTop: '0.5rem', textAlign: 'center' }}>
+                    Uploading: {uploadProgress}%
+                  </div>
+                )}
+                {galleryForm.image && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '1rem' }}>
+                    <img src={galleryForm.image} className="preview-thumbnail" alt="Preview" />
+                    <input 
+                      type="text" 
+                      value={galleryForm.image} 
+                      onChange={e => setGalleryForm({...galleryForm, image: e.target.value})} 
+                      style={{ fontSize: '0.75rem', height: '36px' }}
+                      onClick={e => e.stopPropagation()} 
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowGalleryModal(false)}>CANCEL</button>
+                <button type="submit" className="btn btn-primary">SAVE ITEM</button>
               </div>
             </form>
           </div>
