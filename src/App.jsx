@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   auth, db 
 } from './firebase';
-import { supabase } from './supabase';
+import { upload } from '@imagekit/javascript';
 import { 
   signInWithEmailAndPassword, 
   signOut, 
@@ -212,47 +212,64 @@ function App() {
     }
   };
 
-  // Direct File Uploader to Supabase
+  
   const handleFileDirectUpload = async (file, type) => {
     if (!file) return;
-
+  
     setUploadProgress(10);
+  
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
-      const filePath = `${type}/${fileName}`;
-
-      // Upload file to the public 'exess-assets' bucket in Supabase
-      const { data, error } = await supabase.storage
-        .from('exess-assets')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (error) throw error;
-
-      setUploadProgress(60);
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('exess-assets')
-        .getPublicUrl(filePath);
-
-      setUploadProgress(100);
-
-      if (type === 'events') {
-        setEventForm(prev => ({ ...prev, image: publicUrl }));
-      } else if (type === 'projects') {
-        setProjectForm(prev => ({ ...prev, image: publicUrl }));
-      } else if (type === 'team') {
-        setTeamForm(prev => ({ ...prev, image: publicUrl }));
-      } else if (type === 'gallery') {
-        setGalleryForm(prev => ({ ...prev, image: publicUrl }));
+      const authResponse = await fetch(
+        'http://localhost:3000/api/imagekit-auth'
+      );
+    
+      if (!authResponse.ok) {
+        throw new Error('Failed to authenticate with ImageKit');
       }
+    
+      const authData = await authResponse.json();
+    
+      setUploadProgress(30);
+    
+      const fileExt = file.name.split('.').pop();
+    
+      const fileName = `${Date.now()}_${Math.random()
+        .toString(36)
+        .substring(2, 7)}.${fileExt}`;
+      
+      const result = await upload({
+        file,
+        fileName,
+        folder: `/${type}`,
+        publicKey: import.meta.env.VITE_IMAGEKIT_PUBLIC_KEY,
+        token: authData.token,
+        expire: authData.expire,
+        signature: authData.signature
+      });
+    
+      setUploadProgress(90);
+    
+      const imageUrl = result.url;
+    
+      if (!imageUrl) {
+        throw new Error('ImageKit did not return an image URL');
+      }
+    
+      setUploadProgress(100);
+    
+      if (type === 'events') {
+        setEventForm(prev => ({ ...prev, image: imageUrl }));
+      } else if (type === 'projects') {
+        setProjectForm(prev => ({ ...prev, image: imageUrl }));
+      } else if (type === 'team') {
+        setTeamForm(prev => ({ ...prev, image: imageUrl }));
+      } else if (type === 'gallery') {
+        setGalleryForm(prev => ({ ...prev, image: imageUrl }));
+      }
+    
     } catch (err) {
-      console.error("Supabase upload error:", err);
-      alert("Upload failed: " + err.message);
+      console.error('ImageKit upload error:', err);
+      alert('Upload failed: ' + err.message);
     } finally {
       setTimeout(() => setUploadProgress(null), 1000);
     }
