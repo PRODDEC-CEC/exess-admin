@@ -6,25 +6,23 @@ import ImageKit from '@imagekit/nodejs';
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
-app.use(cors({
-  origin: 'http://localhost:5173'
-}));
-
-const imagekit = new ImageKit({
-  privateKey: process.env.IMAGEKIT_PRIVATE_KEY
-});
+// Allow CORS requests in local development
+app.use(cors());
 
 // ImageKit upload authentication endpoint
 app.get('/api/imagekit-auth', (req, res) => {
   try {
-    if (!process.env.IMAGEKIT_PRIVATE_KEY) {
+    const privateKey = process.env.IMAGEKIT_PRIVATE_KEY;
+    if (!privateKey) {
+      console.error('ImageKit Auth Error: IMAGEKIT_PRIVATE_KEY is not configured in .env');
       return res.status(500).json({
-        error: 'IMAGEKIT_PRIVATE_KEY is not configured'
+        error: 'IMAGEKIT_PRIVATE_KEY is not configured in .env'
       });
     }
 
+    const imagekit = new ImageKit({ privateKey });
     const { token, expire, signature } =
       imagekit.helper.getAuthenticationParameters();
 
@@ -32,14 +30,14 @@ app.get('/api/imagekit-auth', (req, res) => {
       token,
       expire,
       signature,
-      publicKey: process.env.IMAGEKIT_PUBLIC_KEY
+      publicKey: process.env.IMAGEKIT_PUBLIC_KEY || process.env.VITE_IMAGEKIT_PUBLIC_KEY || ''
     });
 
   } catch (error) {
     console.error('ImageKit authentication error:', error);
 
     res.status(500).json({
-      error: 'Failed to generate ImageKit authentication parameters'
+      error: error.message || 'Failed to generate ImageKit authentication parameters'
     });
   }
 });

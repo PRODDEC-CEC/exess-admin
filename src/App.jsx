@@ -219,15 +219,20 @@ function App() {
     setUploadProgress(10);
   
     try {
-      const authResponse = await fetch(
-        'http://localhost:3000/api/imagekit-auth'
-      );
+      const authEndpoint = import.meta.env.VITE_IMAGEKIT_AUTH_ENDPOINT || '/api/imagekit-auth';
+      const authResponse = await fetch(authEndpoint);
     
       if (!authResponse.ok) {
-        throw new Error('Failed to authenticate with ImageKit');
+        const errorData = await authResponse.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to authenticate with ImageKit (status ${authResponse.status})`);
       }
     
       const authData = await authResponse.json();
+      const publicKey = authData.publicKey || import.meta.env.VITE_IMAGEKIT_PUBLIC_KEY;
+
+      if (!publicKey) {
+        throw new Error('ImageKit public key is not configured. Please add VITE_IMAGEKIT_PUBLIC_KEY or IMAGEKIT_PUBLIC_KEY to your .env file.');
+      }
     
       setUploadProgress(30);
     
@@ -241,7 +246,7 @@ function App() {
         file,
         fileName,
         folder: `/${type}`,
-        publicKey: import.meta.env.VITE_IMAGEKIT_PUBLIC_KEY,
+        publicKey,
         token: authData.token,
         expire: authData.expire,
         signature: authData.signature
