@@ -2,13 +2,17 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import ImageKit from '@imagekit/nodejs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT) || 3000;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const projectRoot = path.resolve(__dirname, '..');
+const distPath = path.join(projectRoot, 'dist');
 
-// Allow CORS requests in local development
 app.use(cors());
 
 // ImageKit upload authentication endpoint
@@ -40,6 +44,20 @@ app.get('/api/imagekit-auth', (req, res) => {
       error: error.message || 'Failed to generate ImageKit authentication parameters'
     });
   }
+});
+
+app.use(express.static(distPath));
+
+app.get(/.*/, (req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    return next();
+  }
+
+  res.sendFile(path.join(distPath, 'index.html'), (error) => {
+    if (error) {
+      next(error);
+    }
+  });
 });
 
 app.listen(PORT, () => {
